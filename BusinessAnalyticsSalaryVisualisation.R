@@ -64,3 +64,40 @@ ggplot(data1, aes(x = Avg_Salary, y = Sector, size = Company_Size_Group, fill = 
     override.aes = list(size = 5) # Set the size of the legend bubbles for Job Title
   ))
   
+
+## Choropleth Map: 
+
+state_salaryx <- data1 %>%
+  group_by(Job_Location) %>%
+  summarise(
+    Mean_Salary = mean(Avg_Salary, na.rm = TRUE),
+    Salary_Count = sum(!is.na(Avg_Salary))
+  )
+map_data <- us_map(regions = "states")
+map_data <- map_data %>%
+  left_join(state_salaryx, by = c("abbr" = "Job_Location"))
+summary(map_data$Mean_Salary)
+map_data <- map_data %>%
+  filter(!is.na(Mean_Salary))
+view(map_data)
+top_3_states <- map_data %>%
+  arrange(desc(Salary_Count)) %>%
+  slice_head(n = 3) %>%
+  pull(abbr) # Get the top 3 state abbreviations
+map_data <- map_data %>%
+  mutate(highlight = ifelse(abbr %in% top_3_states, "Highlight", "Normal"))
+state_centroids <- st_centroid(map_data)
+ggplot(data1 = map_data) +
+  geom_sf(aes(fill = Mean_Salary), color = "white") +
+  geom_sf(data1 = map_data %>% filter(highlight == "Highlight"),
+          aes(fill = Mean_Salary), color = "gold", size = 40, alpha = 40) +
+  scale_fill_gradient(low = "#ffcccc", high = "#800000", na.value = "grey90") +
+  geom_sf_text(data1 = state_centroids, aes(label = abbr), size = 4, color = "white") +
+  labs(title = "Average Salary by State with Top 3 States Highlighted", fill = "Mean Salary") +
+  theme_void() +
+  theme(
+    plot.title = element_text(size = 18, face = "bold", hjust = 0.5),
+    legend.position = "bottom",
+    legend.title = element_text(size = 12),
+    legend.text = element_text(size = 10)
+  )
